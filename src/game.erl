@@ -26,10 +26,8 @@
 -on_load(start/0).
 
 -define(SERVER, ?MODULE).
--define(STARTING_POS, 2).
--define(STARTING_DIRECTION, 1).
--define(UPDATE_STATE_TIMER, 100).
--define(BROADCAST_TIMER, 200).
+-define(UPDATE_STATE_TIMER, 10000).
+-define(BROADCAST_TIMER, 10000).
 
 
 %%%===================================================================
@@ -64,7 +62,7 @@ start_link() ->
 init([]) ->
     spawn_link(?MODULE, broadcast, [self(),?BROADCAST_TIMER]),
     spawn_link(?MODULE, update_player, [self(),?UPDATE_STATE_TIMER]),
-    gen_server:cast(self(), create_player),
+    gen_server:cast(self(), start_player),
     {ok, []}.
 
 %%--------------------------------------------------------------------
@@ -96,11 +94,14 @@ handle_call(_Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 %% Indentifier is based on the PID!
-handle_cast(create_player, State) ->
-    io:format("Player state is:  ~p~n",[State]),
-    PlayerPid = player:start_link(),
-    Player = [#{"pid" => PlayerPid, "pos" => {?STARTING_POS,?STARTING_POS}, "direction" => {?STARTING_DIRECTION,?STARTING_DIRECTION}}],
-    {noreply, State ++ Player};
+handle_cast(start_player , State) ->
+    player:start_link(self()),
+    {noreply, State};
+
+handle_cast({make_player, Player} , State) ->
+    io:format("making player...."),
+    {noreply, [{map_get("pid",Player),Player}] ++ State};
+
 handle_cast(send_broadcast, State) ->
     io:format("Player state is:  ~p~n",[State]),
     {noreply, State};
@@ -108,6 +109,7 @@ handle_cast(update_player_state, State) ->
     NewState = update_coords(State),
     {noreply, NewState};
 handle_cast(_Msg, State) ->
+    io:format("game module got message"),
     {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -120,6 +122,10 @@ handle_cast(_Msg, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_info({"start_player"} , State) ->
+    io:format("Player state is:  ~p~n",[State]),
+    player:start_link(self()),
+    {noreply, State};
 handle_info(_Info, State) ->
     {noreply, State}.
 
@@ -174,7 +180,8 @@ start() ->
     ok.
 
 update_coords(Entities) ->
-    [Player#{"pos" := {X+DX,Y+DY}} || Player = #{"pos" := {X,Y},"direction" := {DX,DY}} <- Entities].
+
+[ {Pid,Player#{"pos" := {X+DX,Y+DY}}} || {Pid,Player = #{"pos" := {X,Y},"direction" := {DX,DY}} }<- Entities].
 
 % player_to_jsonB(Player) ->
 %     Player = #{"pos" := {X,Y},"direction" := {DX,DY}, "pid" := Pid}

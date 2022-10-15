@@ -11,7 +11,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0]).
+-export([start_link/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -22,8 +22,10 @@
          code_change/3]).
 
 -define(SERVER, ?MODULE).
+-define(STARTING_POS, 2).
+-define(STARTING_DIRECTION, 1).
 
--record(state, {}).
+-record(state,{player,game_server_pid}).
 
 %%%===================================================================
 %%% API
@@ -36,8 +38,8 @@
 %% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
-start_link() ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+start_link(Pid) ->
+    gen_server:start_link({local, ?SERVER}, ?MODULE, [Pid], []).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -54,8 +56,10 @@ start_link() ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([]) ->
-    {ok, #state{}}.
+init([Pid]) ->
+    Player = #{"pid" => self(), "pos" => {?STARTING_POS,?STARTING_POS}, "direction" => {?STARTING_DIRECTION,?STARTING_DIRECTION}},
+    gen_server:cast(Pid, {make_player, Player}),
+    {ok, #state{player = Player, game_server_pid = Pid}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -125,6 +129,8 @@ terminate(_Reason, _State) ->
 %%--------------------------------------------------------------------
 code_change(_OldVsn, State, _Extra) ->
         {ok, State}.
+
+
 
 %%%===================================================================
 %%% Internal functions
